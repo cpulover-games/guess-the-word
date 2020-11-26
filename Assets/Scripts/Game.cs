@@ -14,13 +14,18 @@ public class Game : MonoBehaviour
         new string[] {"Vietnam", "America", "Poland", "Afghanistan", "Belgium", "Argentina","Cambodia","Egypt","Ethiopia","Kyrgyzstan"},
         new string[] { "Pharmacist", "Photojournalist", "Barber", "Accountant","Optometrist", "Arborist","Astrophysicist","Gunsmiths","Brewer","Imam"}
     };
-    const int HIDDEN_FACTOR = 3;     // 1/part of word length that will be hidden
-    const char HIDDEN_CHAR = '*';  // charater used to hide characters of the word
     const int MAX_ATTEMP = 3;
+    const char HIDDEN_CHAR = '*';  // charater used to hide characters of the word
+
+    // types
+    enum Screen { MAIN_MENU, GAME_PLAY, GAME_OVER, MODE_SETTING, DIFFICULTY_SETTING };
+    enum Mode { HIDE, SHUFFLE };
+    enum HideDifficulty { EASY = 4, NORMAL = 3, HARD = 2 };
 
     /* game state */
-    enum Screen { MAIN_MENU, GAME_PLAY, GAME_OVER };
     Screen screen;
+    Mode mode;
+    HideDifficulty hideDifficulty;     // 1/part of word length that will be hidden
     int currentTopic;
     string[] currentWordList;
     int currentWordIndex;
@@ -30,6 +35,8 @@ public class Game : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        mode = Mode.SHUFFLE;
+        hideDifficulty = HideDifficulty.NORMAL;
         ShowMainMenu();
     }
 
@@ -37,13 +44,84 @@ public class Game : MonoBehaviour
     {
         screen = Screen.MAIN_MENU;
         Terminal.ClearScreen();
-        Terminal.WriteLine("Welcome to Guess the Word!\n\n" +
+        Terminal.WriteLine("Welcome to Guess the Word!\n" +
+            "(type 'setting' to configure game)\n\n"+
             "Choose a topic:");
         for (int i = 0; i < topicList.Length; i++)
         {
             Terminal.WriteLine((i + 1) + ". " + topicList[i]);
         }
         Terminal.WriteLine("Enter your number: ");
+    }
+
+    void ShowModeSetting()
+    {
+        screen = Screen.MODE_SETTING;
+        Terminal.ClearScreen();
+        Terminal.WriteLine("Choose game mode:\n" +
+            "1. Hide charaters\n" +
+            "2. Shuffle charaters\n" +
+            "Enter your number: ");
+    }
+
+    void HandleModeSettingInput(string input)
+    {
+        int inputInt;
+
+        // if input can be parsed as int
+        if (Int32.TryParse(input, out inputInt) && inputInt < 3 && inputInt > 0)
+        {
+            if(inputInt == 1) {
+                mode = Mode.HIDE;
+                ShowDifficultySetting();
+            } else
+            {
+                mode = Mode.SHUFFLE;
+                ShowMainMenu();
+            }
+        }
+        else
+        {
+            Terminal.WriteLine("Invalid option!");
+        }
+    }
+
+    void ShowDifficultySetting()
+    {
+        screen = Screen.DIFFICULTY_SETTING;
+        Terminal.ClearScreen();
+        Terminal.WriteLine("Choose diffuculty level:\n" +
+            "1. Easy\n" +
+            "2. Normal\n" +
+            "3. Hard\n" +
+            "Enter your number: ");
+    }
+
+    void HandleDifficultySettingInput(string input)
+    {
+        int inputInt;
+
+        // if input can be parsed as int
+        if (Int32.TryParse(input, out inputInt) && inputInt < 4 && inputInt > 0)
+        {
+            switch (inputInt)
+            {
+                case 1:
+                    hideDifficulty = HideDifficulty.EASY;
+                    break;
+                case 2:
+                    hideDifficulty = HideDifficulty.NORMAL;
+                    break;
+                case 3:
+                    hideDifficulty = HideDifficulty.HARD;
+                    break;
+            }
+            ShowMainMenu();
+        }
+        else
+        {
+            Terminal.WriteLine("Invalid option!");
+        }
     }
 
     void ShowTitle()
@@ -58,6 +136,9 @@ public class Game : MonoBehaviour
         if (input == "menu")
         {
             ShowMainMenu();
+        } else if (input == "setting")
+        {
+            ShowModeSetting();
         }
         else
         {
@@ -68,6 +149,12 @@ public class Game : MonoBehaviour
                     break;
                 case Screen.GAME_PLAY:
                     CheckWord(input);
+                    break;
+                case Screen.MODE_SETTING:
+                    HandleModeSettingInput(input);
+                    break;
+                case Screen.DIFFICULTY_SETTING:
+                    HandleDifficultySettingInput(input);
                     break;
             }
         }
@@ -84,7 +171,7 @@ public class Game : MonoBehaviour
         }
         else
         {
-            if (attempCount < MAX_ATTEMP-1)
+            if (attempCount < MAX_ATTEMP - 1)
             {
                 attempCount++;
                 Terminal.WriteLine("Wrong answer! You can try " + (MAX_ATTEMP - attempCount) + " more times");
@@ -133,6 +220,7 @@ public class Game : MonoBehaviour
 
     void ShowGameOver()
     {
+        screen = Screen.GAME_OVER;
         Terminal.ClearScreen();
         Terminal.WriteLine("Congratulation!\n" +
             "You have " + score + "/" + currentWordList.Length + " correct answer(s)");
@@ -143,24 +231,40 @@ public class Game : MonoBehaviour
     {
         ShowTitle();
 
-        char[] formattedWord = word.ToUpper().ToCharArray();
-
-        var rand = new System.Random();
-        List<int> hiddenPositions = new List<int>();
-
-        // hide 2.5 length of the current word
-        hiddenPositions.AddRange(Enumerable.Range(0, formattedWord.Length - 1)
-                               .OrderBy(i => rand.Next())
-                               .Take((int)(formattedWord.Length / HIDDEN_FACTOR)));
-        foreach (int index in hiddenPositions)
+        if (mode == Mode.HIDE)
         {
-            if (formattedWord[index] != ' ')
-            {
-                formattedWord[index] = HIDDEN_CHAR;
-            }
-        }
+            char[] formattedWord = word.ToUpper().ToCharArray();
 
-        Terminal.WriteLine(new string(formattedWord));
+            var rand = new System.Random();
+            List<int> hiddenPositions = new List<int>();
+
+            // hide 2.5 length of the current word
+            hiddenPositions.AddRange(Enumerable.Range(0, formattedWord.Length - 1)
+                                   .OrderBy(i => rand.Next())
+                                   .Take((int)(formattedWord.Length / (double)hideDifficulty)));
+            foreach (int index in hiddenPositions)
+            {
+                if (formattedWord[index] != ' ')
+                {
+                    formattedWord[index] = HIDDEN_CHAR;
+                }
+            }
+
+            Terminal.WriteLine(new string(formattedWord));
+        }
+        else if (mode == Mode.SHUFFLE)
+        {
+            string[] wordComponents = word.Split(null); // split by space
+            string formattedWord = null;
+
+            // shuffle each component of the word
+            foreach (string component in wordComponents)
+            {
+                formattedWord += (component.Anagram()+ " ");
+            }
+
+            Terminal.WriteLine(formattedWord.ToUpper());
+        }
     }
 
     void PlayGame()
